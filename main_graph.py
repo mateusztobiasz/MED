@@ -27,9 +27,9 @@ def clarans(data, num_clusters, numlocal, maxneighbor):
         
         current_fitting = fit(list(old_medoids))
 
-        old_medoids_list = list(old_medoids)
-        old_medoids_list.remove(Oi)
-        reduced_fitting = fit(old_medoids_list)
+        old_medoids_reduced = list(old_medoids)
+        old_medoids_reduced.remove(Oi)
+        reduced_fitting = fit(old_medoids_reduced)
 
         total_cost = 0
         for j, Oj in enumerate(data):
@@ -39,7 +39,7 @@ def clarans(data, num_clusters, numlocal, maxneighbor):
             d_jh = np.linalg.norm(np.array(Oj) - np.array(Oh))
 
             if closest_medoid == Oi:
-                Oj2 = old_medoids_list[reduced_fitting[j]]
+                Oj2 = old_medoids_reduced[reduced_fitting[j]]
                 d_jj2 = np.linalg.norm(np.array(Oj) - np.array(Oj2))
                 
                 # Case 1: Point moves from Oi to a previously existing medoid
