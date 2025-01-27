@@ -1,0 +1,7 @@
+liac-arff
+matplotlib
+networkx
+numpy==1.26.4
+scikit-learn
+scikit-learn-extra
+seaborn

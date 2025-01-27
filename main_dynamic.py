@@ -1,7 +1,14 @@
+import argparse
+import datetime
 import random
 import numpy as np
 
-import matplotlib.pyplot as plt
+from arff_parser import ArffParser
+from clustering_algs import ClusteringAlgs
+from plot_drawer import PlotDrawer
+
+random.seed(42)
+
 
 def clarans(data, num_clusters, numlocal, maxneighbor):
     """
@@ -22,7 +29,7 @@ def clarans(data, num_clusters, numlocal, maxneighbor):
 
         i = set(old_medoids).difference(set(new_medoids)).pop()
         h = set(new_medoids).difference(set(old_medoids)).pop()
-        
+
         current_fitting = fit(old_medoids)
 
         old_medoids_reduced = old_medoids[:]
@@ -39,7 +46,7 @@ def clarans(data, num_clusters, numlocal, maxneighbor):
             if closest_medoid == i:
                 j2 = reduced_fitting[j]
                 d_jj2 = np.linalg.norm(np.array(Oj) - np.array(data[j2]))
-                
+
                 # Case 1: Point moves from Oi to a previously existing medoid
                 if d_jh >= d_jj2:
                     total_cost += d_jj2 - d_ji
@@ -49,7 +56,7 @@ def clarans(data, num_clusters, numlocal, maxneighbor):
                     total_cost += d_jh - d_ji
             else:
                 d_jj2 = np.linalg.norm(np.array(Oj) - np.array(data[closest_medoid]))
-                
+
                 # Case 4: Point moves from other than Oi to the new medoid
                 if d_jh < d_jj2:
                     total_cost += d_jh - d_jj2
@@ -57,11 +64,11 @@ def clarans(data, num_clusters, numlocal, maxneighbor):
                 # Case 3: Point does not change its cluster - cost does not change
 
         return total_cost
-    
+
     def fit(medoids: list) -> list:
         """Returns list of medoid indices for each element in dataset."""
         return [find_closest_medoid(item, medoids) for item in data]
-    
+
     def find_closest_medoid(point: tuple, medoids: list) -> int:
         """
         Determine the closest medoid for a given point.
@@ -108,8 +115,14 @@ def clarans(data, num_clusters, numlocal, maxneighbor):
         return neighbors
 
     def calculate_quality(medoids: list) -> float:
-        return 0
-    
+        medoid_indexes = fit(medoids)
+        best_medoids = [data[i] for i in medoid_indexes]
+
+        np_best_medoids = np.array(best_medoids)
+        np_data = np.array(data)
+
+        return np.linalg.norm(np_best_medoids - np_data)
+
     bestnode = None
     best_cost = float("inf")
 
@@ -140,41 +153,59 @@ def clarans(data, num_clusters, numlocal, maxneighbor):
         # Step 5: Update the best node if the current node is better
         final_cost = calculate_quality(current)
         if final_cost < best_cost:
+            clusters = fit(current)
             bestnode = current
             best_cost = final_cost
 
     # Step 6: Return the best medoids indices found
-    return bestnode
+    return bestnode, clusters
 
-# Example usage:
-data = [
-    (1.0, 2.0), (1.5, 1.8), (5.0, 8.0), (8.0, 8.0), (1.0, 0.6), (9.0, 11.0), (8.0, 2.0), (10.0, 2.0), (9.0, 3.0)
-]
 
-num_clusters = 2
-numlocal = 2
-maxneighbor = max(250, 0.0125 * num_clusters * (len(data) - num_clusters))
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Cluster data from a file.")
+    parser.add_argument("--filepath", type=str, required=True, help="Path to the input file.")
+    parser.add_argument("--clusters", type=int, required=True, help="Number of clusters.")
 
-best_medoids_idx = clarans(data, num_clusters, numlocal, maxneighbor)
-best_medoids = [data[i] for i in best_medoids_idx]
+    args = parser.parse_args()
 
-print("Best medoids (points):", best_medoids)
+    num_clusters = args.clusters
+    file_path = args.filepath
 
-# Tworzymy wykres
-data = np.array(data)
-best_medoids = np.array(best_medoids)
+    parser = ArffParser()
+    drawer = PlotDrawer()
 
-plt.scatter(data[:, 0], data[:, 1], color='blue', label='Punkty danych')  # Punkty danych
-plt.scatter(best_medoids[:, 0], best_medoids[:, 1], color='red', marker='X', s=100, label='Medoidy')  # Medoidy
+    parser.load_file(file_path)
+    data = parser.get_data()
 
-# Opcjonalnie, dodanie etykiet i tytułu
-plt.title("Wykres punktów danych oraz medoidów")
-plt.xlabel("X")
-plt.ylabel("Y")
+    
 
-# Dodanie legendy
-plt.legend()
+    # PAM
+    start = datetime.datetime.now()
+    best_medoids, clusters = ClusteringAlgs.pam(data, num_clusters)
+    end = datetime.datetime.now()   
 
-# Wyświetlenie wykresu
-plt.grid(True)
-plt.show()
+    print(f"[PAM] Time: {end - start}")
+    print("[PAM]: Best medoids (points):", best_medoids)
+    drawer.draw(data, best_medoids, clusters)
+
+    # CLARA
+    start = datetime.datetime.now()
+    best_medoids, clusters = ClusteringAlgs.clara(data, num_clusters)
+    end = datetime.datetime.now()
+
+    print(f"[CLARA] Time: {end - start}")
+    print("[CLARA]: Best medoids (points):", best_medoids)
+    drawer.draw(data, best_medoids, clusters)
+
+    # CLARANS
+    numlocal = 2
+    maxneighbor = max(250, 0.0125 * num_clusters * (len(data) - num_clusters))
+
+    start = datetime.datetime.now()
+    best_medoids_idx, clusters = clarans(data, num_clusters, numlocal, maxneighbor)
+    end = datetime.datetime.now()
+    best_medoids = [data[i] for i in best_medoids_idx]
+
+    print(f"[CLARANS] Time: {end - start}")
+    print("[CLARANS]: Best medoids (points):", best_medoids)
+    drawer.draw(data, best_medoids, clusters)
